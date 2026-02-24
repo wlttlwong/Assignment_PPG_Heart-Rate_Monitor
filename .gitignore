@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# backend (Python / Flask demo)
+backend/venv/
+backend/__pycache__/
+backend/*.joblib
+backend/labeled_records.json

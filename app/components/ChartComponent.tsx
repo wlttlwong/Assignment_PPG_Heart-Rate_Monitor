@@ -31,6 +31,8 @@ export default function ChartComponent({
   ppgData,
   valleys,
 }: ChartComponentProps) {
+  const hasData = ppgData.length >= 2;
+
   const chartData = {
     labels: Array.from({ length: ppgData.length }, (_, i) => i.toString()),
     datasets: [
@@ -70,8 +72,14 @@ export default function ChartComponent({
   return (
     <div className="bg-white p-4 rounded-lg shadow-md">
       <h2 className="text-lg font-semibold mb-2">PPG Signal</h2>
-      <div className="h-75">
-        <Line data={chartData} options={chartOptions} />
+      <div className="h-75 min-h-[200px]">
+        {hasData ? (
+          <Line data={chartData} options={chartOptions} />
+        ) : (
+          <div className="flex h-full min-h-[200px] items-center justify-center rounded bg-gray-100 text-gray-500">
+            Start recording to see the signal
+          </div>
+        )}
       </div>
     </div>
   );

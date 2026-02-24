@@ -348,5 +348,17 @@
     },
     "ppgData": [],
     "timestamp": "2026-02-23T15:54:06.611Z"
+  },
+  {
+    "heartRate": {
+      "bpm": 0,
+      "confidence": 0
+    },
+    "hrv": {
+      "sdnn": 0,
+      "confidence": 0
+    },
+    "ppgData": [],
+    "timestamp": "2026-02-24T00:54:23.654Z"
   }
 ]

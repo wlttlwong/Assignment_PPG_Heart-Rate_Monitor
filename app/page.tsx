@@ -2,7 +2,7 @@
 import useCamera from './hooks/useCamera';
 import SimpleCard from './components/SimpleCard';
 import ChartComponent from './components/ChartComponent';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import usePPGFromSamples from './hooks/usePPGFromSamples';
 import { computePPGFromRGB } from './lib/ppg';
 import type { SignalCombinationMode } from './components/SignalCombinationSelector';
@@ -86,36 +86,6 @@ export default function Home() {
       setSegmentStatus('Error: request failed');
     }
   }
-  async function runInference() {
-    if (samples.length < 50) {
-      setInferenceResult({
-        label: null,
-        confidence: 0,
-        message: 'Need more samples',
-      });
-      return;
-    }
-    const segment = samples.slice(-SEGMENT_LENGTH);
-    try {
-      const res = await fetch('/api/infer-quality', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ppgData: segment }),
-      });
-      const data = await res.json();
-      setInferenceResult({
-        label: data.label ?? null,
-        confidence: data.confidence ?? 0,
-        message: data.message,
-      });
-    } catch {
-      setInferenceResult({
-        label: null,
-        confidence: 0,
-        message: 'Request failed',
-      });
-    }
-  }
   async function sendToApi() {
     const res = await fetch('/api/echo', {
       method: 'POST',
@@ -185,109 +155,164 @@ export default function Home() {
     };
   }, [isRecording]);
 
+  // Continuous quality inference while recording (when enough samples)
+  const samplesRef = useRef<number[]>([]);
+  samplesRef.current = samples;
+  const INFERENCE_INTERVAL_MS = 2500;
+  useEffect(() => {
+    if (!isRecording) return;
+    let cancelled = false;
+    async function run() {
+      const current = samplesRef.current;
+      if (current.length < SEGMENT_LENGTH) return;
+      const segment = current.slice(-SEGMENT_LENGTH);
+      try {
+        const res = await fetch('/api/infer-quality', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ppgData: segment }),
+        });
+        const data = await res.json();
+        if (!cancelled) {
+          setInferenceResult({
+            label: data.label ?? null,
+            confidence: data.confidence ?? 0,
+            message: data.message,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setInferenceResult({
+            label: null,
+            confidence: 0,
+            message: 'Request failed',
+          });
+        }
+      }
+    }
+    run();
+    const id = setInterval(run, INFERENCE_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [isRecording]);
+
   return (
     <main className="p-8">
       <h1 className="text-xl font-bold mb-4">Canvas sampling and POST</h1>
-      <video ref={videoRef} autoPlay muted playsInline className="hidden" />
-      <canvas
-        ref={canvasRef}
-        className={
-          isRecording
-            ? 'w-96 max-w-full border border-gray-400 bg-black'
-            : 'hidden'
-        }
-      />
-      {/* In JSX, after the canvas and sample display'*/}:
-      {samples.length > 1 && (
-        <div className="mt-4">
-          <ChartComponent ppgData={samples} valleys={valleys} />
-          <SignalCombinationSelector
-            value={signalCombination}
-            onChange={setSignalCombination}
+
+      {/* Camera panel: always visible; placeholder when not recording */}
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold mb-2">Camera</h2>
+        <div className="w-96 max-w-full border border-gray-400 bg-black min-h-[240px] flex items-center justify-center overflow-hidden rounded">
+          <video ref={videoRef} autoPlay muted playsInline className="hidden" />
+          {isRecording ? (
+            <canvas
+              ref={canvasRef}
+              className="w-full h-full min-h-[240px] object-contain"
+            />
+          ) : (
+            <span className="text-gray-500 text-sm">
+              Start recording to see camera
+            </span>
+          )}
+        </div>
+        <div className="mt-2">
+          <button
+            onClick={() => setIsRecording((r) => !r)}
+            className="px-4 py-2 bg-green-500 text-white rounded"
+          >
+            {isRecording ? 'Stop recording' : 'Start recording'}
+          </button>
+          {error && <p className="text-red-600 mt-2">{error}</p>}
+        </div>
+      </div>
+
+      {/* Chart, quality, and controls: layout always present */}
+      <div className="mt-4">
+        <ChartComponent ppgData={samples} valleys={valleys} />
+        <SignalCombinationSelector
+          value={signalCombination}
+          onChange={setSignalCombination}
+        />
+        <div className="mt-2 flex flex-wrap gap-4">
+          <SimpleCard
+            title="Heart rate"
+            value={heartRate.bpm > 0 ? `${heartRate.bpm} bpm` : '--'}
           />
-          <div className="mt-2 flex flex-wrap gap-4">
-            <SimpleCard
-              title="Heart rate"
-              value={heartRate.bpm > 0 ? `${heartRate.bpm} bpm` : '--'}
-            />
-            <SimpleCard
-              title="Confidence"
-              value={
-                heartRate.confidence > 0
-                  ? `${heartRate.confidence.toFixed(0)}%`
-                  : '--'
-              }
-            />
+          <SimpleCard
+            title="Confidence"
+            value={
+              heartRate.confidence > 0
+                ? `${heartRate.confidence.toFixed(0)}%`
+                : '--'
+            }
+          />
+        </div>
+        <div className="mt-4 border-t pt-4">
+          <h3 className="font-medium mb-2">Collect labeled data (for ML)</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            Choose a label, watch the signal until it matches, then click Send
+            to save this segment.
+          </p>
+          <div className="flex items-center gap-4 mb-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="segmentLabel"
+                checked={segmentLabel === 'good'}
+                onChange={() => setSegmentLabel('good')}
+              />
+              Good
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="segmentLabel"
+                checked={segmentLabel === 'bad'}
+                onChange={() => setSegmentLabel('bad')}
+              />
+              Bad
+            </label>
           </div>
-          <div className="mt-4 border-t pt-4">
-            <h3 className="font-medium mb-2">Collect labeled data (for ML)</h3>
-            <p className="text-sm text-gray-600 mb-2">
-              Choose a label, watch the signal until it matches, then click Send
-              to save this segment.
-            </p>
-            <div className="flex items-center gap-4 mb-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="segmentLabel"
-                  checked={segmentLabel === 'good'}
-                  onChange={() => setSegmentLabel('good')}
-                />
-                Good
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="segmentLabel"
-                  checked={segmentLabel === 'bad'}
-                  onChange={() => setSegmentLabel('bad')}
-                />
-                Bad
-              </label>
-            </div>
-            <button
-              onClick={sendLabeledSegment}
-              className="px-4 py-2 bg-amber-500 text-white rounded"
-            >
-              Send labeled segment
-            </button>
-            {segmentStatus && (
-              <p className="mt-2 text-sm">{segmentStatus}</p>
+          <button
+            onClick={sendLabeledSegment}
+            className="px-4 py-2 bg-amber-500 text-white rounded"
+          >
+            Send labeled segment
+          </button>
+          {segmentStatus && (
+            <p className="mt-2 text-sm">{segmentStatus}</p>
+          )}
+        </div>
+        <div className="mt-4 border-t pt-4">
+          <h3 className="font-medium mb-2">Signal quality (ML inference)</h3>
+          <p className="text-sm text-gray-600 mb-2">
+            Quality updates continuously while recording (when enough samples
+            are available).
+          </p>
+          <div className="mt-2 text-sm">
+            {inferenceResult?.message && (
+              <p className="text-gray-600">{inferenceResult.message}</p>
             )}
-          </div>
-          <div className="mt-4 border-t pt-4">
-            <h3 className="font-medium mb-2">Signal quality (ML inference)</h3>
-            <button
-              onClick={runInference}
-              className="px-4 py-2 bg-purple-500 text-white rounded"
-            >
-              Check quality
-            </button>
-            {inferenceResult && (
-              <div className="mt-2 text-sm">
-                {inferenceResult.message && (
-                  <p className="text-gray-600">{inferenceResult.message}</p>
-                )}
-                {inferenceResult.label && (
-                  <p>
-                    Predicted: <strong>{inferenceResult.label}</strong>
-                    {inferenceResult.confidence > 0 &&
-                      ` (${(inferenceResult.confidence * 100).toFixed(0)}% confidence)`}
-                  </p>
-                )}
-              </div>
+            {inferenceResult?.label ? (
+              <p>
+                Predicted: <strong>{inferenceResult.label}</strong>
+                {inferenceResult.confidence > 0 &&
+                  ` (${(inferenceResult.confidence * 100).toFixed(0)}% confidence)`}
+              </p>
+            ) : (
+              <p className="text-gray-500">
+                {isRecording && samples.length < SEGMENT_LENGTH
+                  ? 'Collecting samples…'
+                  : !isRecording
+                    ? 'Start recording for quality inference'
+                    : '--'}
+              </p>
             )}
           </div>
         </div>
-      )}
-      <div className="mt-4">
-        <button
-          onClick={() => setIsRecording((r) => !r)}
-          className="px-4 py-2 bg-green-500 text-white rounded"
-        >
-          {isRecording ? 'Stop recording' : 'Start recording'}
-        </button>
-        {error && <p className="text-red-600 mt-2">{error}</p>}
       </div>
       <div className="mt-4 flex flex-wrap gap-4">
         <SimpleCard
