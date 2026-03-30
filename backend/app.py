@@ -1,3 +1,5 @@
+import base64
+import io
 import json
 import os
 from datetime import datetime
@@ -14,21 +16,21 @@ CORS(app)
 QUALITY_MODEL = None
 QUALITY_SCALER = None
 
+BASE_DIR = os.path.dirname(__file__)
+model_path = os.path.join(BASE_DIR, "quality_model.joblib")
+scaler_path = os.path.join(BASE_DIR, "quality_scaler.joblib")
 
 def load_quality_model():
     global QUALITY_MODEL, QUALITY_SCALER
     if QUALITY_MODEL is not None:
         return
     try:
-        import joblib
-        model_path = os.path.join(os.path.dirname(__file__), "quality_model.joblib")
-        scaler_path = os.path.join(os.path.dirname(__file__), "quality_scaler.joblib")
         if os.path.exists(model_path) and os.path.exists(scaler_path):
             QUALITY_MODEL = joblib.load(model_path)
             QUALITY_SCALER = joblib.load(scaler_path)
-    except Exception:
-        pass
-
+            print("Loaded quality model and scaler.")
+    except Exception as e:
+        print(f"Error loading model/scaler: {e}")
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "records.json")
 LABELED_FILE = os.path.join(os.path.dirname(__file__), "labeled_records.json")
@@ -57,6 +59,26 @@ def save_labeled(records):
     with open(LABELED_FILE, "w") as f:
         json.dump(records, f, indent=2)
 
+@app.route('/upload-model', methods=['POST'])
+def upload_model():
+    global QUALITY_MODEL, QUALITY_SCALER
+    try:
+        body = request.get_json()
+        if not body or "model" not in body or "scaler" not in body:
+            return jsonify({"success": False, "error": "Missing model or scaler in request"}), 400
+        model_bytes = base64.b64decode(body["model"])
+        scaler_bytes = base64.b64decode(body["scaler"])
+        
+        with open(model_path, "wb") as f:
+            f.write(model_bytes)
+        with open(scaler_path, "wb") as f:
+            f.write(scaler_bytes)
+        
+        load_quality_model(force_reload=True)
+        
+        return jsonify({"success": True, "message": "Model and scaler uploaded successfully."}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -134,3 +156,7 @@ def infer_quality():
         return jsonify({"label": label, "confidence": round(confidence, 2)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    load_quality_model()
+    app.run(debug=True, port=5000)
