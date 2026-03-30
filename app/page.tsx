@@ -394,14 +394,23 @@ async function handleUploadModel(modelFile: File | null, scalerFile: File | null
               Bad
             </label>
           </div>
+        <div className="flex flex-wrap gap-4">
           <button
             onClick={sendLabeledSegment}
             className="px-4 py-2 bg-amber-500 text-white rounded"
           >
             Send labeled segment
           </button>
-          {segmentStatus && <p className="mt-2 text-sm">{segmentStatus}</p>}
+          <button
+            onClick={downloadLabeledJson}
+            className="px-6 py-2 bg-white border-2 border-amber-600 text-amber-700 hover:bg-amber-50 font-semibold rounded-lg disabled:opacity-50 transition"
+            disabled={labeledSegments.length === 0}
+          >
+            Download .JSON
+          </button>
         </div>
+          {segmentStatus && <p className="mt-2 text-sm">{segmentStatus}</p>}
+      </div>
 
         {/* Assignment: Add Upload model and scaler UI here (Additional Work 2). */}
         <div className="mt-4 border-t pt-4">
