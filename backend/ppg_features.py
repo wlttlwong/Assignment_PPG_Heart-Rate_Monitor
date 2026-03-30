@@ -5,9 +5,11 @@ def extract_ppg_features(signal):
     """Extract 8 features from a PPG segment (list or array). Same as notebook."""
     arr = np.asarray(signal, dtype=float)
     if len(arr) < 2:
-        return np.zeros(8)  # fallback if segment too short
+        return np.zeros(9)  # fallback if segment too short
     mean = np.mean(arr)
     std = np.std(arr)
+    variance = np.var(arr)
+    
     if std < 1e-7:
         std = 1e-7
     diff = arr - mean
@@ -16,9 +18,10 @@ def extract_ppg_features(signal):
     signal_range = np.max(arr) - np.min(arr)
     zero_crossings = np.sum(np.abs(np.diff(np.sign(diff)))) // 2
     rms = np.sqrt(np.mean(np.square(arr)))
-    peak_to_peak = signal_range
+    
+    mad = np.mean(np.abs(diff))
     return np.array([
         mean, std, skewness, kurtosis,
         signal_range, zero_crossings,
-        rms, peak_to_peak
+        rms, variance, mad
     ], dtype=float)
