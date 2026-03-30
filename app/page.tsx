@@ -163,46 +163,46 @@ export default function Home() {
     if (!ctx) return;
   
     let animationFrameId: number;
+    let lastUpdateTime = 0; // Track the last time we updated state
+    const targetFps = 30; // Target 30 updates per second to stay stable
+    const msPerFrame = 1000 / targetFps;
   
-    function tick() {
+    function tick(timestamp: number) { // Use the timestamp provided by rAF
       const v = videoRef.current;
       const canvas = canvasRef.current;
+  
       if (!v?.srcObject || v.readyState < 2 || !canvas) {
         animationFrameId = requestAnimationFrame(tick);
         return;
       }
   
-      canvas.width = v.videoWidth;
-      canvas.height = v.videoHeight;
-      ctx!.drawImage(v, 0, 0);
+      // ONLY update state if enough time has passed (Throttling)
+      if (timestamp - lastUpdateTime >= msPerFrame) {
+        canvas.width = v.videoWidth;
+        canvas.height = v.videoHeight;
+        ctx!.drawImage(v, 0, 0);
   
-      const w = 10, h = 10;
-      const x = (canvas.width - w) / 2;
-      const y = (canvas.height - h) / 2;
+        const w = 10, h = 10;
+        const x = (canvas.width - w) / 2;
+        const y = (canvas.height - h) / 2;
   
-      ctx!.strokeStyle = 'red';
-      ctx!.lineWidth = 2;
-      ctx!.strokeRect(x, y, w, h);
+        const data = ctx!.getImageData(x, y, w, h).data;
+        let rSum = 0, gSum = 0, bSum = 0, pixelCount = 0;
   
-      const data = ctx!.getImageData(x, y, w, h).data;
-      let rSum = 0, gSum = 0, bSum = 0, pixelCount = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          rSum += data[i]; gSum += data[i + 1]; bSum += data[i + 2];
+          pixelCount += 1;
+        }
   
-      for (let i = 0; i < data.length; i += 4) {
-        rSum += data[i];
-        gSum += data[i + 1];
-        bSum += data[i + 2];
-        pixelCount += 1;
+        const ppgValue = computePPGFromRGB(
+          rSum, gSum, bSum, pixelCount,
+          signalModeRef.current,
+        );
+  
+        setSamples((prev) => [...prev.slice(-(SAMPLES_TO_KEEP - 1)), ppgValue]);
+        lastUpdateTime = timestamp; // Update the last successful run time
       }
   
-      const ppgValue = computePPGFromRGB(
-        rSum,
-        gSum,
-        bSum,
-        pixelCount,
-        signalModeRef.current,
-      );
-  
-      setSamples((prev) => [...prev.slice(-(SAMPLES_TO_KEEP - 1)), ppgValue]);
       animationFrameId = requestAnimationFrame(tick);
     }
   
