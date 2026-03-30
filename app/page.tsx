@@ -20,6 +20,10 @@ export default function Home() {
   const { valleys, heartRate, hrv } = usePPGFromSamples(samples);
   const [signalCombination, setSignalCombination] =
     useState<SignalCombinationMode>('default');
+    const signalModeRef = useRef(signalCombination);
+  useEffect(() => {
+    signalModeRef.current = signalCombination;
+  }, [signalCombination]);
 
   const [backendStatus, setBackendStatus] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
@@ -153,58 +157,72 @@ export default function Home() {
   useEffect(() => {
     const video = videoRef.current;
     const c = canvasRef.current;
+    
+    // Only run if recording; stop entirely if not
     if (!isRecording || !video || !c) return;
-
+  
     const ctx = c.getContext('2d');
     if (!ctx) return;
-
-    let running = true;
+  
+    let animationFrameId: number;
+  
     function tick() {
-      if (!running || !ctx) return;
       const v = videoRef.current;
-      const c = canvasRef.current;
-      if (!v?.srcObject || !v.videoWidth || !c) {
-        requestAnimationFrame(tick);
+      const canvas = canvasRef.current;
+  
+      // Safety check for video stream readiness
+      if (!v?.srcObject || v.readyState < 2 || !canvas) {
+        animationFrameId = requestAnimationFrame(tick);
         return;
       }
-      c.width = v.videoWidth;
-      c.height = v.videoHeight;
-      ctx.drawImage(v, 0, 0);
-      const w = 10,
-        h = 10;
-      const x = (c.width - w) / 2;
-      const y = (c.height - h) / 2;
-      ctx.strokeStyle = 'red';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x, y, w, h);
-      const data = ctx.getImageData(x, y, w, h).data;
-      let rSum = 0,
-        gSum = 0,
-        bSum = 0,
-        pixelCount = 0;
+  
+      canvas.width = v.videoWidth;
+      canvas.height = v.videoHeight;
+      ctx!.drawImage(v, 0, 0);
+  
+      const w = 10, h = 10;
+      const x = (canvas.width - w) / 2;
+      const y = (canvas.height - h) / 2;
+  
+      ctx!.strokeStyle = 'red';
+      ctx!.lineWidth = 2;
+      ctx!.strokeRect(x, y, w, h);
+  
+      const data = ctx!.getImageData(x, y, w, h).data;
+      let rSum = 0, gSum = 0, bSum = 0, pixelCount = 0;
+  
       for (let i = 0; i < data.length; i += 4) {
         rSum += data[i];
         gSum += data[i + 1];
         bSum += data[i + 2];
         pixelCount += 1;
       }
+  
+      // USE THE REF HERE:
       const ppgValue = computePPGFromRGB(
         rSum,
         gSum,
         bSum,
         pixelCount,
-        signalCombination,
+        signalModeRef.current, // No longer triggers re-runs of the effect
       );
-
+  
       setSamples((prev) => [...prev.slice(-(SAMPLES_TO_KEEP - 1)), ppgValue]);
-
-      requestAnimationFrame(tick);
+  
+      animationFrameId = requestAnimationFrame(tick);
     }
-    tick();
+  
+    // Start the loop asynchronously
+    animationFrameId = requestAnimationFrame(tick);
+  
+    // Clean up: This stops the loop when isRecording becomes false 
+    // or the component unmounts.
     return () => {
-      running = false;
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
     };
-  }, [isRecording, signalCombination]);
+  }, [isRecording]); // signalCombination is intentionally REMOVED from here
 
   return (
     <main className="p-8">
