@@ -32,6 +32,14 @@ export default function Home() {
   const [segmentLabel, setSegmentLabel] = useState<SegmentLabel>('good');
   const [segmentStatus, setSegmentStatus] = useState<string | null>(null);
 
+    // State for Additional Work 1
+    const [labeledSegments, setLabeledSegments] = useState<{ ppgData: number[]; label: string }[]>([]);
+
+    // State and Refs for Additional Work 2
+    const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+    const modelInputRef = useRef<HTMLInputElement>(null);
+    const scalerInputRef = useRef<HTMLInputElement>(null);
+
   const [inferenceResult, setInferenceResult] = useState<{
     label: string | null;
     confidence: number;
@@ -109,8 +117,13 @@ export default function Home() {
         body: JSON.stringify({ ppgData: ppgSegment, label: segmentLabel }),
       });
       const data = await res.json();
-      if (data.success) setSegmentStatus(`Saved as ${segmentLabel}`);
-      else setSegmentStatus('Error: ' + (data.error || 'Unknown'));
+      if (data.success) {
+        setSegmentStatus(`Saved as ${segmentLabel}`);
+        // Save to local state for downloading later
+        setLabeledSegments((prev) => [...prev, { ppgData: ppgSegment, label: segmentLabel }]);
+      } else {
+        setSegmentStatus('Error: ' + (data.error || 'Unknown'));
+      }
     } catch {
       setSegmentStatus('Error: request failed');
     }
@@ -223,6 +236,47 @@ export default function Home() {
       }
     };
   }, [isRecording]); // signalCombination is intentionally REMOVED from here
+
+  // Handler for Additional Work 1
+function downloadLabeledJson() {
+  if (labeledSegments.length === 0) return;
+  const json = JSON.stringify(labeledSegments, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'labeled_records.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Handler for Additional Work 2
+async function handleUploadModel(modelFile: File | null, scalerFile: File | null) {
+  if (!modelFile || !scalerFile) { 
+    setUploadStatus('Select both model and scaler files'); 
+    return; 
+  }
+  setUploadStatus("Uploading...");
+  try {
+    const toBase64 = (f: File) => f.arrayBuffer().then((buf) => 
+      btoa(String.fromCharCode(...new Uint8Array(buf)))
+    );
+    const model = await toBase64(modelFile);
+    const scaler = await toBase64(scalerFile);
+    
+    const res = await fetch('/api/upload-model', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ model, scaler }) 
+    });
+    
+    const data = await res.json();
+    setUploadStatus(res.ok && data.success ? 'Model uploaded successfully' : (data.error || 'Upload failed'));
+  } catch (err) {
+    setUploadStatus('Upload failed: check console');
+    console.error(err);
+  }
+}
 
   return (
     <main className="p-8">
@@ -347,7 +401,6 @@ export default function Home() {
             Send labeled segment
           </button>
           {segmentStatus && <p className="mt-2 text-sm">{segmentStatus}</p>}
-          {/* Assignment: Add "Download labeled_records.json" button here (Additional Work 1). */}
         </div>
 
         {/* Assignment: Add Upload model and scaler UI here (Additional Work 2). */}
