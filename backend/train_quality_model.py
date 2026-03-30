@@ -1,7 +1,7 @@
 import json
 import os
 import numpy as np
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
@@ -22,20 +22,30 @@ def load_labeled():
 
 def main():
     records = load_labeled()
+    if len(records) < 20:
+        print("Current records: {len(records)}. Goal: at least 20 for better results.")
     if len(records) < 4:
-        print("Need at least 4 labeled segments (e.g. 2 good, 2 bad).")
+        print("Error: Need more data to train.")
         return
+    
     X = np.array([extract_ppg_features(r["ppgData"]) for r in records])
     y = np.array([1 if r["label"] == "good" else 0 for r in records])
+    
+    if len(np.unique(y)) < 2:
+        print("Error: Need both 'good' and 'bad' labels to train.")
+        return
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
-    model = LogisticRegression(max_iter=500)
+    model = RandomForestClassifier(max_iter=100, random_state=42)
     model.fit(X_train_scaled, y_train)
-    score = model.score(scaler.transform(X_test), y_test)
+    
+    X_test_scaled = scaler.transform(X_test)
+    score = model.score(X_test_scaled, y_test)
     print(f"Test accuracy: {score:.2f}")
+    
     try:
         import joblib
         joblib.dump(model, MODEL_FILE)
