@@ -95,14 +95,29 @@ export function hrvFromValleys(
   return { sdnn: Math.round(sdnn), confidence };
 }
 
+export type SignalComputationMode = 'default' | 'redOnly' | 'greenOnly' | '2xG-R-B' | 'blueOnly';
 export function computePPGFromRGB(
   rSum: number,
   gSum: number,
   bSum: number,
   pixelCount: number,
-  mode: string,
+  mode: SignalComputationMode | string,
 ): number {
-  // Default: 2R−G−B. Assignment: add cases for redOnly, greenOnly, 2xG-R-B (Additional Work 3).
-  if (mode === 'default') return (2 * rSum - gSum - bSum) / pixelCount;
-  return (2 * rSum - gSum - bSum) / pixelCount; // fallback
+  if (pixelCount === 0) return 0;
+  const R =rSum / pixelCount;
+  const G = gSum / pixelCount;
+  const B = bSum / pixelCount;
+  switch (mode) {
+    case 'redOnly':
+      return R;
+    case 'greenOnly':
+      return G;
+    case 'blueOnly':
+      return B;
+    case '2xG-R-B':
+      return 2 * G - R - B;
+    case 'default':
+    default:
+      return 2 * R - G - B;
+  }
 }
