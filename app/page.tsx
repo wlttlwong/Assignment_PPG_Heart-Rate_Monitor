@@ -15,7 +15,7 @@ import SignalCombinationSelector from './components/SignalCombinationSelector';
 export default function Home() {
   const { videoRef, canvasRef, isRecording, setIsRecording, error } = useCamera();
   const [samples, setSamples] = useState<number[]>([]);
-  const { heartRate, hrv } = usePPGFromSamples(samples);
+  const { valleys, heartRate, hrv } = usePPGFromSamples(samples);
   const [signalCombination, setSignalCombination] = useState<SignalCombinationMode>('default');
   const signalModeRef = useRef(signalCombination);
   
@@ -247,12 +247,52 @@ export default function Home() {
             <div className="w-2 h-2 rounded-full bg-[#3B82F6]" />
             <h2 className="text-sm font-bold text-slate-800 tracking-wider">Signal & Metrics</h2>
           </div>
+
           <div className="space-y-6">
+            {/* Signal combination selector */}
+            <div className='max-w-md'>
             <SignalCombinationSelector value={signalCombination} onChange={setSignalCombination} />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <SimpleCard title="Heart rate" value={heartRate.bpm > 0 ? `${heartRate.bpm} bpm` : '--'} />
-              <SimpleCard title="Confidence" value={heartRate.confidence > 0 ? `${heartRate.confidence.toFixed(0)}%` : '--'} />
-              <SimpleCard title="HRV" value={hrv.sdnn > 0 ? `${hrv.sdnn} ms` : '--'} />
+            </div>
+
+            {/* PPG Signal Chart */}
+            <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+              <div className="h-full w-full pb-8">
+                <ChartComponent ppgData={samples} valleys={valleys} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Heart Rate</p>
+                <p className="text-xl font-bold text-slate-900">
+                  {heartRate.bpm > 0 ? `${heartRate.bpm} bpm` : '--'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Confidence</p>
+                <p className="text-xl font-bold text-slate-900">
+                  {heartRate.confidence > 0 ? `${heartRate.confidence.toFixed(0)}%` : '--'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HRV</p>
+                <p className="text-xl font-bold text-slate-900">
+                  {hrv.sdnn > 0 ? `${hrv.sdnn.toFixed(0)} ms` : '--'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Quality</p>
+                  <p className={`text-xl font-bold ${
+                    inferenceResult?.label === 'good' ? 'text-emerald-600' : 'text-rose-600'
+                  }`}>
+                    {inferenceResult?.label
+                      ? `${inferenceResult.label} (${(inferenceResult.confidence * 100).toFixed(0)}%)`
+                      : '--'}
+                  </p>
+              </div>
             </div>
           </div>
         </section>
