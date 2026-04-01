@@ -1,4 +1,4 @@
-**BIOF3001 Final Project** | **Antonia (ltwonggg)**
+**BIOF3003 Final Project** | **Antonia (ltwonggg)**
 
 ## Deployment Links
 
