@@ -42,23 +42,36 @@ export default function Home() {
       setUploadStatus('Select both model and scaler files');
       return;
     }
+    
     setUploadStatus("Uploading...");
+    
     try {
-      const toBase64 = (f: File) => new Promise<string>((resolve) => {
+      const toBase64 = (f: File): Promise<string> => new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.readAsDataURL(f);
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = (error) => reject(error);
         reader.readAsDataURL(f);
       });
+  
+      // Now these lines will actually finish and move to the next step
       const modelBase64 = await toBase64(modelFile);
       const scalerBase64 = await toBase64(scalerFile);
+  
       const res = await fetch('/api/upload-model', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: modelBase64, scaler: scalerBase64 })
       });
+  
       const data = await res.json();
-      setUploadStatus(res.ok && data.success ? 'Model uploaded successfully' : (data.error || 'Upload failed'));
+      
+      if (res.ok && data.success) {
+        setUploadStatus('Model uploaded successfully');
+      } else {
+        setUploadStatus(data.error || 'Upload failed');
+      }
     } catch (err) {
+      console.error(err);
       setUploadStatus('Upload failed: check connection');
     }
   }

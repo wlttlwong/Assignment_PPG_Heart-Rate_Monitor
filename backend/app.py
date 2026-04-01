@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 
 import numpy as np
+import joblib 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -20,15 +21,21 @@ BASE_DIR = os.path.dirname(__file__)
 model_path = os.path.join(BASE_DIR, "quality_model.joblib")
 scaler_path = os.path.join(BASE_DIR, "quality_scaler.joblib")
 
-def load_quality_model():
+# Modified to accept force_reload so the upload route can refresh the model
+def load_quality_model(force_reload=False):
     global QUALITY_MODEL, QUALITY_SCALER
-    if QUALITY_MODEL is not None:
+    
+    # If already loaded and not forcing a reload, just return
+    if not force_reload and QUALITY_MODEL is not None:
         return
+        
     try:
         if os.path.exists(model_path) and os.path.exists(scaler_path):
             QUALITY_MODEL = joblib.load(model_path)
             QUALITY_SCALER = joblib.load(scaler_path)
-            print("Loaded quality model and scaler.")
+            print("Successfully loaded quality model and scaler.")
+        else:
+            print("Model files not found. Please train and upload.")
     except Exception as e:
         print(f"Error loading model/scaler: {e}")
 
@@ -66,18 +73,23 @@ def upload_model():
         body = request.get_json()
         if not body or "model" not in body or "scaler" not in body:
             return jsonify({"success": False, "error": "Missing model or scaler in request"}), 400
+        
+        # Decode the base64 strings
         model_bytes = base64.b64decode(body["model"])
         scaler_bytes = base64.b64decode(body["scaler"])
         
+        # Write the new files to disk
         with open(model_path, "wb") as f:
             f.write(model_bytes)
         with open(scaler_path, "wb") as f:
             f.write(scaler_bytes)
         
+        # Force the global variables to update with the new files
         load_quality_model(force_reload=True)
         
         return jsonify({"success": True, "message": "Model and scaler uploaded successfully."}), 200
     except Exception as e:
+        print(f"Upload Route Error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/health', methods=['GET'])
@@ -136,27 +148,34 @@ def infer_quality():
         if not body or not body.get("ppgData"):
             return jsonify({"error": "Missing ppgData"}), 400
         ppg_data = body["ppgData"]
-        if not isinstance(ppg_data, list) or len(ppg_data) < 10:
-            return jsonify(
-                {"error": "ppgData must be an array with at least 10 points"}
-            ), 400
+        
+        # Ensure model is loaded (if not already)
         load_quality_model()
+        
         if QUALITY_MODEL is None or QUALITY_SCALER is None:
             return jsonify({
                 "label": None,
                 "confidence": 0,
-                "message": "No model trained yet. Collect labeled segments and run train_quality_model.py.",
+                "message": "No model loaded. Please upload model and scaler files.",
             }), 200
-        features = extract_ppg_features(ppg_data).reshape(1, -1)
-        X = QUALITY_SCALER.transform(features)
-        pred = QUALITY_MODEL.predict(X)[0]
-        proba = QUALITY_MODEL.predict_proba(X)[0]
+            
+        # Extract features and predict
+        features = np.array(extract_ppg_features(ppg_data)).reshape(1, -1)
+        X_scaled = QUALITY_SCALER.transform(features)
+        
+        pred = QUALITY_MODEL.predict(X_scaled)[0]
+        proba = QUALITY_MODEL.predict_proba(X_scaled)[0]
+        
         label = "good" if pred == 1 else "bad"
         confidence = float(max(proba))
+        
         return jsonify({"label": label, "confidence": round(confidence, 2)})
     except Exception as e:
+        print(f"Inference Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    # Initial load on startup
     load_quality_model()
+    # Running on 5000 - Ensure your Next.js route.ts matches this!
     app.run(debug=True, port=5000)

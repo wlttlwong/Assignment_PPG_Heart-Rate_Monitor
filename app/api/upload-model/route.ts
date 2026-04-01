@@ -1,27 +1,49 @@
-// app/api/upload-model/route.ts
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
+    // 1. Parse the base64 model and scaler data from the frontend
     const body = await request.json();
 
-    // This forwards the base64 files to your Python FastAPI/Flask server
-    const response = await fetch('http://127.0.0.1:8000/upload-model', {
+    if (!body.model || !body.scaler) {
+      return NextResponse.json(
+        { success: false, error: "Missing model or scaler data in request body" },
+        { status: 400 }
+      );
+    }
+
+    // 2. Forward the data to your Flask backend
+    // IMPORTANT: We use 127.0.0.1:5000 to match your app.run(port=5000)
+    const flaskBackendUrl = 'http://127.0.0.1:5000/upload-model';
+
+    const response = await fetch(flaskBackendUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(body),
     });
 
+    // 3. Check if Flask handled the request successfully
     if (!response.ok) {
-      throw new Error(`Backend responded with ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`Flask Backend Error (${response.status}): ${errorText}`);
     }
 
     const data = await response.json();
+
+    // 4. Return the Flask response (success: true) back to the UI
     return NextResponse.json(data);
+
   } catch (error: any) {
-    console.error("Upload API Error:", error);
+    console.error("Next.js API Route Error:", error);
+
+    // If Flask isn't running, this catch block will trigger
     return NextResponse.json(
-      { success: false, error: "Backend unreachable. Ensure your Python server is running on port 8000." },
+      { 
+        success: false, 
+        error: "Could not connect to Flask. Ensure 'python app.py' is running on port 5000." 
+      },
       { status: 502 }
     );
   }
