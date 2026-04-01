@@ -34,6 +34,34 @@ export default function Home() {
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const modelInputRef = useRef<HTMLInputElement>(null);
   const scalerInputRef = useRef<HTMLInputElement>(null);
+  const [modelFile, setModelFile] = useState<File | null>(null);
+  const [scalerFile, setScalerFile] = useState<File | null>(null);
+
+  async function handleUploadModel() {
+    if (!modelFile || !scalerFile) {
+      setUploadStatus('Select both model and scaler files');
+      return;
+    }
+    setUploadStatus("Uploading...");
+    try {
+      const toBase64 = (f: File) => new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(f);
+        reader.readAsDataURL(f);
+      });
+      const modelBase64 = await toBase64(modelFile);
+      const scalerBase64 = await toBase64(scalerFile);
+      const res = await fetch('/api/upload-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelBase64, scaler: scalerBase64 })
+      });
+      const data = await res.json();
+      setUploadStatus(res.ok && data.success ? 'Model uploaded successfully' : (data.error || 'Upload failed'));
+    } catch (err) {
+      setUploadStatus('Upload failed: check connection');
+    }
+  }
 
   const [inferenceResult, setInferenceResult] = useState<{
     label: string | null;
@@ -297,7 +325,72 @@ export default function Home() {
           </div>
         </section>
 
-        {/* 4. ML SECTION */}
+        {/* 4. UPLOAD MODEL SECTION */}
+        <section className="bg-white rounded-[24px] p-8 shadow-sm border border-slate-100">
+          <div className="flex flex-col gap-1 mb-6">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-[#6366F1]" />
+              <h2 className="text-sm font-bold text-slate-800 tracking-wider">Upload trained model</h2>
+            </div>
+            <p className="text-[11px] text-slate-400 font-medium ml-4 leading-relaxed">
+              After training locally (run train_quality_model.py on downloaded JSON), select each file, then click Upload.
+            </p>
+          </div>
+
+          <div className="space-y-3 ml-4">
+            <input type="file" ref={modelInputRef} className="hidden" onChange={(e) => setModelFile(e.target.files?.[0] || null)} />
+            <input type="file" ref={scalerInputRef} className="hidden" onChange={(e) => setScalerFile(e.target.files?.[0] || null)} />
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => modelInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition shadow-sm"
+              >
+                <span className="text-[14px]">📄</span>
+                <span className="text-xs font-bold text-slate-700">Model file</span>
+              </button>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {modelFile ? modelFile.name : "Not selected"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => scalerInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition shadow-sm"
+              >
+                <span className="text-[14px]">📄</span>
+                <span className="text-xs font-bold text-slate-700">Scaler file</span>
+              </button>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {scalerFile ? scalerFile.name : "Not selected"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-4 pt-4">
+              <button
+                onClick={handleUploadModel}
+                disabled={!modelFile || !scalerFile}
+                className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-bold transition-all shadow-md ${
+                  modelFile && scalerFile
+                  ? 'bg-[#6366F1] text-white hover:bg-[#4F46E5] active:scale-95'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                <span>📤</span> Upload model
+              </button>
+              {uploadStatus && (
+                <span className={`text-xs font-bold ${
+                  uploadStatus.includes('successfully') ? 'text-emerald-500' : 'text-rose-500'
+                }`}>
+                  {uploadStatus}
+                </span>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* 5. ML SECTION */}
         <section className="bg-white rounded-[24px] p-8 shadow-sm border border-slate-100">
           <div className="flex items-center gap-2 mb-6">
             <div className="flex items-center gap-2">

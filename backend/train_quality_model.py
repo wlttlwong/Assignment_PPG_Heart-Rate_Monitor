@@ -19,6 +19,26 @@ def load_labeled():
             return json.load(f)
     return []
 
+def extract_ppg_feature(ppg_data):
+    sig = np.array(ppg_data)
+    mean_val = np.mean(sig)
+    std_val = np.std(sig)
+    max_val = np.max(sig)
+    min_val = np.min(sig)
+    range_val = max_val - min_val
+    variance = np.var(sig)
+    
+    # New Feature 1 - Zero Crossing Rate (for the detection of high-frequency noise)
+    centered = sig - mean_val
+    zcr = ((centered[:-1] * centered[1:]) < 0).sum() / len(sig)
+    
+    # New Feature 2 - Signal Energy (detects if finger is off camera)
+    energy = np.sum(sig**2) / len(sig)
+    
+    # New Feature 3 - Absolute Differencing (detects sudden jumps/jitters)
+    abs_diffs = np.mean(np.abs(np.diff(sig)))
+    
+    return [mean_val, std_val, range_val, variance, zcr, energy, abs_diffs]
 
 def main():
     records = load_labeled()
@@ -39,7 +59,8 @@ def main():
     )
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
-    model = RandomForestClassifier(max_iter=100, random_state=42)
+    # 
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
     model.fit(X_train_scaled, y_train)
     
     X_test_scaled = scaler.transform(X_test)
