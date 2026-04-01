@@ -235,10 +235,13 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#F8FAFC] py-12 px-4 font-sans text-slate-700">
       <div className="max-w-3xl mx-auto space-y-6">
-        
         <header className="text-center space-y-4 mb-10">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white shadow-sm border border-slate-100 text-rose-500 text-xl">❤️</div>
           <h1 className="text-3xl font-bold text-slate-900">PPG Heart-Rate Monitor</h1>
+          <p className="text-slate-500 max-w-xl mx-auto text-sm">
+            Place your finger over the camera to measure heart rate, HRV, and signal quality.
+            Collect labeled data, train your model, and upload for inference.
+          </p>
         </header>
   
         {/* 1. CAMERA SECTION */}
@@ -318,7 +321,7 @@ export default function Home() {
                   }`}>
                     {inferenceResult?.label
                       ? `${inferenceResult.label} (${(inferenceResult.confidence * 100).toFixed(0)}%)`
-                      : '--'}
+                      : 'Collecting'}
                   </p>
               </div>
             </div>
