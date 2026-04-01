@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+**BIOF3001 Final Project** | **Antonia (ltwonggg)**
 
-## Getting Started
+## Deployment Links
 
-First, run the development server:
+* **Frontend (Vercel):** `https://assignment-ppg-heart-rate-monitor-wlttlwongs-projects.vercel.app?_vercel_share=Ayk2FCnfAci3yUwWtgF2uCPkUjK5jtI2`
+* **Backend API (PythonAnywhere):** `https://ltwonggg.pythonanywhere.com/heath`
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Project Architecture
+The system is built with a decoupled Full-Stack architecture:
+* **Frontend:** Next.js (React) + TypeScript.
+    * Visualizes real-time PPG waves using **Chart.js**.
+    * Manages model and scaler uploads to the remote server.
+    * Handles real-time data table rendering with custom CSS to prevent chart overlap.
+* **Backend:** Flask (Python 3.13) hosted on PythonAnywhere.
+    * **Signal Processing:** Implements peak detection for BPM and HRV calculation.
+    * **ML Inference:** Uses `joblib` to load a **Random Forest** model and `StandardScaler` for real-time quality classification (Good vs. Bad signal).
+* **Integration:** Secured via `flask-cors`. Environment variables (`FLASK_URL`) are used in the Next.js API routes to securely bridge traffic from Vercel to PythonAnywhere.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 1. HRV Feature Extraction
+The backend extracts specific features from the 100Hz signal stream:
+* **Peak Detection:** Identifies systolic peaks to calculate Instantaneous Heart Rate.
+* **SDNN:** Standard deviation of the NN intervals to measure heart rate variability.
+* **RMSSD:** Root mean square of successive differences between peaks, used for short-term variability assessment.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2. Machine Learning Workflow
+The system allows for a "Bring Your Own Model" workflow:
+1.  User trains a model locally on PPG datasets (extracting mean, std, and HRV features).
+2.  User uploads `quality_model.joblib` and `quality_scaler.joblib` via the frontend UI.
+3.  The Flask backend validates the files and uses them for immediate inference on the incoming live stream.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Key Deployment Solutions
+* **WSGI Path Mapping:** Manually configured `sys.path` on PythonAnywhere to resolve `ModuleNotFoundError` by pointing the server to user-installed libraries in `.local/lib/python3.13/site-packages`.
+* **Dynamic Routing:** Implemented `process.env.FLASK_URL` in Next.js API routes to ensure the frontend correctly targets the production API rather than `localhost:5000`.
 
-## Learn More
+## Repository Structure
+* `/app`: Next.js frontend pages and API routes.
+* `/backend`: Flask server logic (`app.py`), model processing, and utility scripts.
+* `/public`: Static assets, fonts, and icons.
 
-To learn more about Next.js, take a look at the following resources:
+## Local Development
+To run this project locally:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1.  **Backend:**
+    ```bash
+    cd backend
+    pip install flask flask-cors joblib scikit-learn
+    python app.py
+    ```
+2.  **Frontend:**
+    ```bash
+    npm install
+    npm run dev
+    ```
