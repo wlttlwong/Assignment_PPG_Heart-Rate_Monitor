@@ -241,7 +241,7 @@ export default function Home() {
           </div>
         </section>
   
-        {/* 2. SIGNALS & METRICS SECTION */}
+        {/* 3. SIGNALS & METRICS SECTION */}
         <section className="bg-white rounded-[24px] p-8 shadow-sm border border-slate-100">
           <div className="flex items-center gap-2 mb-6">
             <div className="w-2 h-2 rounded-full bg-[#3B82F6]" />
@@ -297,20 +297,40 @@ export default function Home() {
           </div>
         </section>
 
-        {/* 3. ML SECTION */}
+        {/* 4. ML SECTION */}
         <section className="bg-white rounded-[24px] p-8 shadow-sm border border-slate-100">
           <div className="flex items-center gap-2 mb-6">
-            <div className="w-2 h-2 rounded-full bg-[#F59E0B]" />
-            <h2 className="text-sm font-bold text-slate-800 tracking-wider font-sans">Collect Labeled Data</h2>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-[#F59E0B]" />
+              <h2 className="text-sm font-bold text-slate-800 tracking-wider">Collect Labeled Data</h2>
+            </div>
+            <p className="text-[11px] text-slate-400 font-medium ml-4">
+              Choose a label, watch the signal until it matches, then send. Data is stored in the browser. Download when ready to train.
+            </p>
           </div>
+
           <div className="space-y-6">
             <div className="flex items-center gap-6">
               <label className="flex items-center gap-2 cursor-pointer"><input type="radio" checked={segmentLabel === 'good'} onChange={() => setSegmentLabel('good')} className="accent-[#10B981]" /> Good</label>
               <label className="flex items-center gap-2 cursor-pointer"><input type="radio" checked={segmentLabel === 'bad'} onChange={() => setSegmentLabel('bad')} className="accent-rose-500" /> Bad</label>
             </div>
+
+            {/* Label Counter*/}
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">
+              Good: {labeledSegments.filter(s => s.label === 'good').length} |
+              Bad: {labeledSegments.filter(s => s.label === 'bad').length} |
+              Total: {labeledSegments.length}
+            </div>
+
             <div className="flex gap-4">
               <button onClick={sendLabeledSegment} className="px-5 py-2 bg-[#F59E0B] text-white text-xs font-bold rounded-xl">Send Segment</button>
               <button onClick={downloadLabeledJson} className="px-5 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl" disabled={labeledSegments.length === 0}>Download JSON</button>
+
+              {segmentStatus && segmentStatus.includes('Saved') && (
+                <span className="text-sm font-bold text-[#76C19D] ml-2">
+                  {segmentStatus}
+                </span>
+              )}
             </div>
           </div>
         </section>
