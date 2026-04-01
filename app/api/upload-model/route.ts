@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
     // 2. Forward the data to your Flask backend
     // IMPORTANT: We use 127.0.0.1:5000 to match your app.run(port=5000)
-    const flaskBackendUrl = 'http://127.0.0.1:5000/upload-model';
+    const backendUrl = process.env.FLASK_URL || 'http://127.0.0.1:5000';
 
     const response = await fetch(flaskBackendUrl, {
       method: 'POST',
